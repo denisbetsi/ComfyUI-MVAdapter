@@ -195,7 +195,7 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
 
         image = self.control_image_processor.preprocess(
             image, height=height, width=width
-        ).to(dtype=torch.float32)
+        ).to(device=device, dtype=torch.float32)
 
         if num_empty_images > 0:
             image = torch.cat(
@@ -532,11 +532,10 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
             dtype=latents.dtype,
             do_classifier_free_guidance=self.do_classifier_free_guidance,
         )
-        control_image_feature = control_image_feature.to(
-            device=device, dtype=latents.dtype
-        )
+        control_image_feature = control_image_feature.to(device=device, dtype=latents.dtype)
 
         adapter_state = self.cond_encoder(control_image_feature)
+        adapter_state = [state.to(device=device, dtype=latents.dtype) for state in adapter_state]
         for i, state in enumerate(adapter_state):
             adapter_state[i] = state * control_conditioning_scale
 
@@ -707,7 +706,7 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
             channels=self.unet.config.block_out_channels,
             num_res_blocks=self.unet.config.layers_per_block,
             downscale_factor=8,
-        )
+        ).to(self.device)
 
         # set custom attn processor for multi-view attention
         self.unet: UNet2DConditionModel

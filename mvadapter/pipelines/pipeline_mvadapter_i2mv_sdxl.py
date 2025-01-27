@@ -666,11 +666,10 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
             dtype=latents.dtype,
             do_classifier_free_guidance=self.do_classifier_free_guidance,
         )
-        control_image_feature = control_image_feature.to(
-            device=device, dtype=latents.dtype
-        )
+        control_image_feature = control_image_feature.to(device=device, dtype=latents.dtype)
 
         adapter_state = self.cond_encoder(control_image_feature)
+        adapter_state = [state.to(device=device, dtype=latents.dtype) for state in adapter_state]  # Ensure adapter states are on GPU
         for i, state in enumerate(adapter_state):
             adapter_state[i] = state * control_conditioning_scale
 
@@ -892,9 +891,9 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
             num_res_blocks=2,
             downscale_factor=16,
             adapter_type="full_adapter_xl",
-        )
+        ).to(self.device)  # Explicitly move to same device as UNet
 
-        # set custom attn processor for multi-view attention and image cross-attention
+        # set custom attn processor for multi-view attention
         self.unet: UNet2DConditionModel
         set_unet_2d_condition_attn_processor(
             self.unet,
