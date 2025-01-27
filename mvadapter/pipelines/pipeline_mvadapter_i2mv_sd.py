@@ -96,6 +96,9 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
             requires_safety_checker=requires_safety_checker,
         )
 
+        # Override parent's prepare_latents with our custom implementation
+        self.prepare_latents = self._prepare_latents
+
         self.control_image_processor = VaeImageProcessor(
             vae_scale_factor=self.vae_scale_factor,
             do_convert_rgb=True,
@@ -774,7 +777,7 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
 
         return state_dict
 
-    def prepare_latents(
+    def _prepare_latents(
         self,
         batch_size,
         num_channels_latents,
