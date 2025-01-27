@@ -916,7 +916,8 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
             num_res_blocks=2,
             downscale_factor=16,
             adapter_type="full_adapter_xl",
-        ).to(self.device)  # Explicitly move to same device as UNet
+            torch_dtype=torch.float16  # Explicitly set dtype to float16
+        ).to(self.device)
 
         # set custom attn processor for multi-view attention
         self.unet: UNet2DConditionModel
