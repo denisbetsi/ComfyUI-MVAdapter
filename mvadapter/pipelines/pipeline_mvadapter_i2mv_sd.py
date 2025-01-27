@@ -137,14 +137,30 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
                 )
 
             elif isinstance(generator, list):
+                # Create new generators on the target device
+                device_generators = []
+                for gen in generator:
+                    if gen is not None:
+                        device_gen = torch.Generator(device=device)
+                        device_gen.manual_seed(gen.initial_seed())
+                        device_generators.append(device_gen)
+                    else:
+                        device_generators.append(None)
+
                 init_latents = [
                     retrieve_latents(
-                        self.vae.encode(image[i : i + 1]), generator=generator[i]
+                        self.vae.encode(image[i : i + 1]), generator=device_generators[i]
                     )
                     for i in range(batch_size)
                 ]
                 init_latents = torch.cat(init_latents, dim=0)
             else:
+                # Create a new generator on the target device if needed
+                if generator is not None and generator.device != device:
+                    device_generator = torch.Generator(device=device)
+                    device_generator.manual_seed(generator.initial_seed())
+                    generator = device_generator
+
                 init_latents = retrieve_latents(
                     self.vae.encode(image), generator=generator
                 )
@@ -171,6 +187,12 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
             init_latents = torch.cat([init_latents], dim=0)
 
         if add_noise:
+            if generator is not None and generator.device != device:
+                # Create a new generator on the target device if needed
+                device_generator = torch.Generator(device=device)
+                device_generator.manual_seed(generator.initial_seed())
+                generator = device_generator
+
             shape = init_latents.shape
             noise = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
             # get latents
