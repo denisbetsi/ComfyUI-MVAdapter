@@ -356,14 +356,25 @@ class DiffusersModelMakeup:
         pipeline.scheduler = scheduler
 
         if load_mvadapter:
+            # Initialize custom adapter before moving to device/dtype
             pipeline.init_custom_adapter(num_views=num_views)
+            
+            # Move pipeline and all its components to device and dtype
+            pipeline = pipeline.to(self.torch_device, self.dtype)
+            
+            # Explicitly convert condition encoder and its components
+            pipeline.cond_encoder = pipeline.cond_encoder.to(device=self.torch_device, dtype=self.dtype)
+            # Convert all submodules of cond_encoder
+            for module in pipeline.cond_encoder.modules():
+                if hasattr(module, 'weight') and module.weight is not None:
+                    module.weight = module.weight.to(dtype=self.dtype)
+                if hasattr(module, 'bias') and module.bias is not None:
+                    module.bias = module.bias.to(dtype=self.dtype)
+            
+            # Now load the adapter weights
             pipeline.load_custom_adapter(
                 adapter_path, weight_name=adapter_name, cache_dir=self.hf_dir
             )
-            # Move pipeline to device and dtype first
-            pipeline = pipeline.to(self.torch_device, self.dtype)
-            # Then ensure cond_encoder is properly initialized with correct dtype
-            pipeline.cond_encoder = pipeline.cond_encoder.to(device=self.torch_device, dtype=self.dtype)
         else:
             pipeline = pipeline.to(self.torch_device, self.dtype)
 
