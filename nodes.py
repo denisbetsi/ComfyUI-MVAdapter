@@ -500,6 +500,15 @@ class DiffusersMVSampler:
         controlnet_conditioning_scale=1.0,
         azimuth_degrees=[0, 45, 90, 180, 270, 315],
     ):
+        # Extract the actual pipeline object from the MAKED_PIPELINE tuple
+        if isinstance(pipeline, (tuple, list)):
+            pipeline = pipeline[0]
+        
+        # Initialize custom adapter with the correct number of views
+        if not hasattr(pipeline, '_custom_adapter_initialized'):
+            pipeline._init_custom_adapter(num_views=num_views)
+            pipeline._custom_adapter_initialized = True
+
         num_views = len(azimuth_degrees)
         control_images = prepare_camera_embed(
             num_views, width, self.torch_device, azimuth_degrees
@@ -521,6 +530,9 @@ class DiffusersMVSampler:
                     "controlnet_conditioning_scale": controlnet_conditioning_scale,
                 }
             )
+
+        # Move pipeline to correct device
+        pipeline.to(self.torch_device)
 
         images = pipeline(
             prompt=prompt,
