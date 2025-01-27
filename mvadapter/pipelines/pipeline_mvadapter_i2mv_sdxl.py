@@ -916,8 +916,16 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
             num_res_blocks=2,
             downscale_factor=16,
             adapter_type="full_adapter_xl",
-            torch_dtype=torch.float16  # Explicitly set dtype to float16
-        ).to(self.device)
+        )
+        
+        # Convert to float16 and move to device
+        self.cond_encoder = self.cond_encoder.to(device=self.device, dtype=torch.float16)
+        # Ensure all submodules are in float16
+        for module in self.cond_encoder.modules():
+            if hasattr(module, 'weight') and module.weight is not None:
+                module.weight.data = module.weight.data.to(dtype=torch.float16)
+            if hasattr(module, 'bias') and module.bias is not None:
+                module.bias.data = module.bias.data.to(dtype=torch.float16)
 
         # set custom attn processor for multi-view attention
         self.unet: UNet2DConditionModel
