@@ -96,69 +96,14 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
             requires_safety_checker=requires_safety_checker,
         )
 
+        # Override parent's prepare_latents with our custom implementation
+        self.prepare_latents = self._prepare_latents
+
         self.control_image_processor = VaeImageProcessor(
             vae_scale_factor=self.vae_scale_factor,
             do_convert_rgb=True,
             do_normalize=False,
         )
-
-    def to(self, torch_device=None, silence_dtype_warnings=False):
-        if torch_device is None:
-            return self
-
-        # First call parent's to() method
-        super().to(torch_device, silence_dtype_warnings)
-        
-        # Ensure control_image_processor is on correct device
-        self.control_image_processor.to(torch_device)
-        
-        # Store device for later use
-        self._execution_device = torch_device
-        return self
-
-    @property
-    def device(self) -> torch.device:
-        r"""
-        Returns the device on which the pipeline is located.
-        """
-        return self._execution_device
-
-    def prepare_latents(
-        self,
-        batch_size,
-        num_channels_latents,
-        height,
-        width,
-        dtype,
-        device,
-        generator,
-        latents=None,
-    ):
-        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
-
-        if latents is None:
-            if isinstance(generator, list):
-                shape = (1,) + shape[1:]
-                # Ensure generators are on the correct device
-                generator = [gen.to(device) for gen in generator]
-                latents = [
-                    randn_tensor(shape, generator=generator[i], device=device, dtype=dtype)
-                    for i in range(batch_size)
-                ]
-                latents = torch.cat(latents, dim=0)
-            else:
-                if generator is not None:
-                    # Ensure generator is on the correct device
-                    generator = generator.to(device)
-                latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
-        else:
-            if latents.shape != shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
-            latents = latents.to(device)
-
-        # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
-        return latents
 
     # Copied from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl_img2img.prepare_latents
     def prepare_image_latents(
@@ -831,3 +776,35 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
         state_dict.update(self.cond_encoder.state_dict())
 
         return state_dict
+
+    def _prepare_latents(
+        self,
+        batch_size,
+        num_channels_latents,
+        height,
+        width,
+        dtype,
+        device,
+        generator,
+        latents=None,
+    ):
+        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
+
+        if isinstance(generator, list):
+            shape = (1,) + shape[1:]
+            # Move all generators to the correct device
+            generator = [gen.to(device) if gen.device != device else gen for gen in generator]
+            latents = [
+                randn_tensor(shape, generator=generator[i], device=device, dtype=dtype)
+                for i in range(batch_size)
+            ]
+            latents = torch.cat(latents, dim=0)
+        else:
+            if generator is not None:
+                # Move generator to the correct device if needed
+                generator = generator.to(device) if generator.device != device else generator
+            latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * self.scheduler.init_noise_sigma
+        return latents
