@@ -977,17 +977,28 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
 
         if isinstance(generator, list):
             shape = (1,) + shape[1:]
-            # Move all generators to the correct device
-            generator = [gen.to(device) if gen.device != device else gen for gen in generator]
+            # Create new generators on the target device
+            device_generators = []
+            for gen in generator:
+                if gen is not None:
+                    device_gen = torch.Generator(device=device)
+                    device_gen.manual_seed(gen.initial_seed())
+                    device_generators.append(device_gen)
+                else:
+                    device_generators.append(None)
+            
             latents = [
-                randn_tensor(shape, generator=generator[i], device=device, dtype=dtype)
-                for i in range(batch_size)
+                randn_tensor(shape, generator=gen, device=device, dtype=dtype)
+                for gen in device_generators
             ]
             latents = torch.cat(latents, dim=0)
         else:
-            if generator is not None:
-                # Move generator to the correct device if needed
-                generator = generator.to(device) if generator.device != device else generator
+            # Create a new generator on the target device if needed
+            if generator is not None and generator.device != device:
+                device_generator = torch.Generator(device=device)
+                device_generator.manual_seed(generator.initial_seed())
+                generator = device_generator
+            
             latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
 
         # scale the initial noise by the standard deviation required by the scheduler
