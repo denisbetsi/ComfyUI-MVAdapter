@@ -173,7 +173,7 @@ class DiffusersSchedulerLoader:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "pipeline": ("PIPELINE",),
+                "pipeline": ("MAKED_PIPELINE",),
                 "scheduler_name": (list(SCHEDULERS.keys()),),
                 "shift_snr": ("BOOLEAN", {"default": True}),
                 "shift_mode": (
