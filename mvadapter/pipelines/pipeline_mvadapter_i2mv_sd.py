@@ -735,25 +735,46 @@ class MVAdapterI2MVSDPipeline(StableDiffusionPipeline, CustomAdapterMixin):
 
         # set custom attn processor for multi-view attention
         self.unet: UNet2DConditionModel
-        set_unet_2d_condition_attn_processor(
-            self.unet,
-            set_self_attn_proc_func=lambda name, hs, cad, ap: self_attn_processor(
-                query_dim=hs,
-                inner_dim=hs,
-                num_views=num_views,
-                name=name,
-                use_mv=True,
-                use_ref=True,
-            ),
-            set_cross_attn_proc_func=lambda name, hs, cad, ap: self_attn_processor(
-                query_dim=hs,
-                inner_dim=hs,
-                num_views=num_views,
-                name=name,
-                use_mv=False,
-                use_ref=False,
-            ),
-        )
+        
+        # First ensure all attention processors are initialized
+        if not hasattr(self.unet, "attn_processors"):
+            self.unet.set_attn_processor(AttnProcessor2_0())
+        
+        # Now set our custom processors
+        attn_procs = {}
+        for name in self.unet.attn_processors.keys():
+            cross_attention_dim = None if name.endswith("attn1.processor") else self.unet.config.cross_attention_dim
+            if name.startswith("mid_block"):
+                hidden_size = self.unet.config.block_out_channels[-1]
+            elif name.startswith("up_blocks"):
+                block_id = int(name[len("up_blocks.")])
+                hidden_size = list(reversed(self.unet.config.block_out_channels))[block_id]
+            elif name.startswith("down_blocks"):
+                block_id = int(name[len("down_blocks.")])
+                hidden_size = self.unet.config.block_out_channels[block_id]
+
+            if cross_attention_dim is None:
+                # self attention
+                attn_procs[name] = self_attn_processor(
+                    query_dim=hidden_size,
+                    inner_dim=hidden_size,
+                    num_views=num_views,
+                    name=name,
+                    use_mv=True,
+                    use_ref=True,
+                )
+            else:
+                # cross attention
+                attn_procs[name] = self_attn_processor(
+                    query_dim=hidden_size,
+                    inner_dim=hidden_size,
+                    num_views=num_views,
+                    name=name,
+                    use_mv=False,
+                    use_ref=False,
+                )
+        
+        self.unet.set_attn_processor(attn_procs)
 
         # copy decoupled attention weights from original unet
         if copy_attn_weights:

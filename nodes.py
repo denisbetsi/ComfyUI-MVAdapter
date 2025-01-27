@@ -442,7 +442,7 @@ class DiffusersMVSampler:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "pipeline": ("PIPELINE",),
+                "pipeline": ("MAKED_PIPELINE",),
                 "num_views": ("INT", {"default": 6, "min": 1, "max": 12}),
                 "prompt": (
                     "STRING",
