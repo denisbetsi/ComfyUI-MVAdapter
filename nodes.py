@@ -196,9 +196,20 @@ class DiffusersSchedulerLoader:
     def load_scheduler(
         self, pipeline, scheduler_name, shift_snr, shift_mode, shift_scale
     ):
+        print("DEBUG: Pipeline type:", type(pipeline))
+        print("DEBUG: Pipeline value:", pipeline)
+        print("DEBUG: Is tuple/list?", isinstance(pipeline, (tuple, list)))
+        
         # Extract pipeline object if it's a tuple
         if isinstance(pipeline, (tuple, list)):
+            print("DEBUG: Pipeline is tuple/list, extracting first element")
             pipeline = pipeline[0]
+        
+        print("DEBUG: Final pipeline type:", type(pipeline))
+        print("DEBUG: Has scheduler?", hasattr(pipeline, 'scheduler'))
+        if hasattr(pipeline, 'scheduler'):
+            print("DEBUG: Scheduler type:", type(pipeline.scheduler))
+            print("DEBUG: Scheduler config:", pipeline.scheduler.config)
             
         scheduler = SCHEDULERS[scheduler_name].from_config(
             pipeline.scheduler.config, torch_dtype=self.dtype
