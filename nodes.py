@@ -196,6 +196,10 @@ class DiffusersSchedulerLoader:
     def load_scheduler(
         self, pipeline, scheduler_name, shift_snr, shift_mode, shift_scale
     ):
+        # Extract pipeline object if it's a tuple
+        if isinstance(pipeline, (tuple, list)):
+            pipeline = pipeline[0]
+            
         scheduler = SCHEDULERS[scheduler_name].from_config(
             pipeline.scheduler.config, torch_dtype=self.dtype
         )
