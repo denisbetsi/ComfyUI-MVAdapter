@@ -958,3 +958,35 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
         state_dict.update(self.cond_encoder.state_dict())
 
         return state_dict
+
+    def prepare_latents(
+        self,
+        batch_size,
+        num_channels_latents,
+        height,
+        width,
+        dtype,
+        device,
+        generator,
+        latents=None,
+    ):
+        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
+
+        if isinstance(generator, list):
+            shape = (1,) + shape[1:]
+            # Move all generators to the correct device
+            generator = [gen.to(device) if gen.device != device else gen for gen in generator]
+            latents = [
+                randn_tensor(shape, generator=generator[i], device=device, dtype=dtype)
+                for i in range(batch_size)
+            ]
+            latents = torch.cat(latents, dim=0)
+        else:
+            if generator is not None:
+                # Move generator to the correct device if needed
+                generator = generator.to(device) if generator.device != device else generator
+            latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * self.scheduler.init_noise_sigma
+        return latents
