@@ -949,7 +949,7 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
 
             if cross_attention_dim is None:
                 # self attention
-                attn_procs[name] = self_attn_processor(
+                processor = self_attn_processor(
                     query_dim=hidden_size,
                     inner_dim=hidden_size,
                     num_views=num_views,
@@ -957,9 +957,16 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
                     use_mv=True,
                     use_ref=True,
                 )
+                # Convert processor weights to float16
+                for module in processor.modules():
+                    if hasattr(module, 'weight') and module.weight is not None:
+                        module.weight.data = module.weight.data.to(dtype=torch.float16)
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        module.bias.data = module.bias.data.to(dtype=torch.float16)
+                attn_procs[name] = processor
             else:
                 # cross attention
-                attn_procs[name] = self_attn_processor(
+                processor = self_attn_processor(
                     query_dim=hidden_size,
                     inner_dim=hidden_size,
                     num_views=num_views,
@@ -967,6 +974,13 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
                     use_mv=False,
                     use_ref=False,
                 )
+                # Convert processor weights to float16
+                for module in processor.modules():
+                    if hasattr(module, 'weight') and module.weight is not None:
+                        module.weight.data = module.weight.data.to(dtype=torch.float16)
+                    if hasattr(module, 'bias') and module.bias is not None:
+                        module.bias.data = module.bias.data.to(dtype=torch.float16)
+                attn_procs[name] = processor
         
         self.unet.set_attn_processor(attn_procs)
 
@@ -986,6 +1000,10 @@ class MVAdapterI2MVSDXLPipeline(StableDiffusionXLPipeline, CustomAdapterMixin):
                     state_dict[key] = torch.zeros_like(state_dict[compatible_key])
                 else:
                     state_dict[key] = state_dict[compatible_key].clone()
+                
+                # Ensure state dict values are float16
+                state_dict[key] = state_dict[key].to(dtype=torch.float16)
+            
             self.unet.load_state_dict(state_dict)
 
     def _load_custom_adapter(self, state_dict):
