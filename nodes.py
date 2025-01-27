@@ -352,49 +352,27 @@ class DiffusersModelMakeup:
         enable_vae_slicing=True,
         enable_vae_tiling=False,
     ):
-        print("DEBUG: Pipeline type:", type(pipeline))
-        print("DEBUG: Pipeline attributes:", dir(pipeline))
-        
-        # Extract pipeline object if it's a tuple
-        if isinstance(pipeline, (tuple, list)):
-            print("DEBUG: Pipeline is tuple/list, extracting components")
-            pipeline_obj = pipeline[0]
-            components_path = pipeline[1]
-            print("DEBUG: Components path:", components_path)
-        else:
-            print("DEBUG: Pipeline is direct object")
-            pipeline_obj = pipeline
-            # Store the components path for DDUF compatibility
-            if hasattr(pipeline, "components_path"):
-                components_path = pipeline.components_path
-            else:
-                components_path = adapter_path  # Use adapter path as fallback
-            print("DEBUG: Using components path:", components_path)
-
-        pipeline_obj.vae = autoencoder
-        pipeline_obj.scheduler = scheduler
-        
-        # Store components path for DDUF compatibility
-        pipeline_obj.components_path = components_path
+        pipeline.vae = autoencoder
+        pipeline.scheduler = scheduler
 
         if load_mvadapter:
-            print("DEBUG: Initializing custom adapter with num_views:", num_views)
-            pipeline_obj.init_custom_adapter(num_views=num_views)
-            print("DEBUG: Loading custom adapter from:", adapter_path)
-            pipeline_obj.load_custom_adapter(
+            pipeline.init_custom_adapter(num_views=num_views)
+            pipeline.load_custom_adapter(
                 adapter_path, weight_name=adapter_name, cache_dir=self.hf_dir
             )
-            pipeline_obj.cond_encoder.to(device=self.torch_device, dtype=self.dtype)
-
-        pipeline_obj = pipeline_obj.to(self.torch_device, self.dtype)
+            # Move pipeline to device and dtype first
+            pipeline = pipeline.to(self.torch_device, self.dtype)
+            # Then ensure cond_encoder is properly initialized with correct dtype
+            pipeline.cond_encoder = pipeline.cond_encoder.to(device=self.torch_device, dtype=self.dtype)
+        else:
+            pipeline = pipeline.to(self.torch_device, self.dtype)
 
         if enable_vae_slicing:
-            pipeline_obj.enable_vae_slicing()
+            pipeline.enable_vae_slicing()
         if enable_vae_tiling:
-            pipeline_obj.enable_vae_tiling()
+            pipeline.enable_vae_tiling()
 
-        # Return as tuple with components path for compatibility
-        return ((pipeline_obj, components_path),)
+        return (pipeline,)
 
 
 class DiffusersSampler:
